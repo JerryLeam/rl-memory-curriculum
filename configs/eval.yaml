@@ -1,0 +1,65 @@
+# Evaluation: 7 models × 2 benchmarks
+# Works with both LoRA and Full FT checkpoints (auto-detected from training_meta.json)
+evaluation:
+  benchmarks:
+    - name: "locomo"
+      test_file: "data/processed/locomo_test.jsonl"
+      num_samples: 1307
+    - name: "longmemeval"
+      test_file: "data/processed/longmemeval_test.jsonl"
+      num_samples: 415
+
+  models:
+    # 1. Baseline: no RL
+    - name: "baseline_no_rl"
+      checkpoint: "Qwen/Qwen2.5-7B-Instruct"
+      is_baseline: true
+
+    # 2-4. AA-only (no MM training)
+    - name: "config_a_aa_only"
+      checkpoint: "checkpoints/config_a_locomo_only/answer_agent/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+    - name: "config_b_aa_only"
+      checkpoint: "checkpoints/config_b_mixed/answer_agent/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+    - name: "config_c_aa_only"
+      checkpoint: "checkpoints/config_c_longmemeval_only/answer_agent/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+
+    # 5-7. AA+MM (full pipeline)
+    - name: "config_a_full"
+      checkpoint: "checkpoints/config_a_locomo_only/answer_agent/"
+      mm_checkpoint: "checkpoints/config_a_locomo_only/memory_manager/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+      use_mm: true
+    - name: "config_b_full"
+      checkpoint: "checkpoints/config_b_mixed/answer_agent/"
+      mm_checkpoint: "checkpoints/config_b_mixed/memory_manager/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+      use_mm: true
+    - name: "config_c_full"
+      checkpoint: "checkpoints/config_c_longmemeval_only/answer_agent/"
+      mm_checkpoint: "checkpoints/config_c_longmemeval_only/memory_manager/"
+      base_model: "Qwen/Qwen2.5-7B-Instruct"
+      use_mm: true
+
+  metrics:
+    - "f1"
+    - "bleu1"
+    - "exact_match"
+    - "llm_judge"
+
+  llm_judge:
+    provider: "openai"         # OpenAI-compatible API (configure via env vars)
+    model: "gpt-4o-mini"       # or any compatible model
+    max_tokens: 256
+
+  hardware:
+    gpus: 1
+    precision: "bf16"
+    batch_size: 8
+
+  retrieval:
+    top_k: 60
+
+  output_dir: "results/"

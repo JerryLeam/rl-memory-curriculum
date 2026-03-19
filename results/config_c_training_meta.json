@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "experiment": "config_c_longmemeval_only",
+  "agent": "answer_agent",
+  "epochs": 3,
+  "group_size": 4,
+  "num_examples": 60,
+  "learning_rate": 5e-06,
+  "lora_r": 16,
+  "lora_alpha": 32
+}

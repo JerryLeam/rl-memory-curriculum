@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen2.5-3B-Instruct",
+  "experiment": "config_b_mixed",
+  "agent": "answer_agent",
+  "epochs": 2,
+  "group_size": 4,
+  "num_examples": 212,
+  "learning_rate": 5e-06,
+  "lora_r": 16,
+  "lora_alpha": 32
+}

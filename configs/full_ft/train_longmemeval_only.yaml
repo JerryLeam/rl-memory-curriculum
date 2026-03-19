@@ -1,0 +1,33 @@
+# Config C (Full FT): LongMemEval-only training (temporal/update focus)
+# Requires H100 80GB or A100 80GB
+experiment:
+  name: "config_c_longmemeval_only"
+  seed: 42
+
+model:
+  name: "Qwen/Qwen2.5-7B-Instruct"
+
+data:
+  train_file: "data/processed/longmemeval_train.jsonl"
+  val_file: "data/processed/longmemeval_val.jsonl"
+
+training:
+  algorithm: "grpo"
+  use_lora: false
+  gradient_checkpointing: true
+  batch_size: 2
+  group_size: 4
+  learning_rate: 1.0e-6
+  gradient_accumulation_steps: 2
+  train_answer_agent: true
+  train_memory_manager: true
+  aa_epochs: 3
+  mm_epochs: 3
+  aa_max_completion_length: 1024
+  mm_max_completion_length: 256
+
+reward:
+  type: "em"
+
+retrieval:
+  top_k: 60
