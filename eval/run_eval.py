@@ -792,6 +792,9 @@ def print_comparison_table(all_results):
 
 
 def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Run evaluation")
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--skip-judge", action="store_true")
@@ -1109,6 +1112,89 @@ def main():
     save_results(all_results, output_dir / "all_results.json")
     logger.info(f"All results saved to {output_dir}")
     print_comparison_table(all_results)
+
+    # Log evaluation results to wandb
+    wandb_cfg = config.get("wandb", {})
+    if wandb_cfg.get("enabled", False) and all_results:
+        _log_eval_to_wandb(all_results, config, output_dir, wandb_cfg)
+
+
+def _log_eval_to_wandb(all_results, config, output_dir, wandb_cfg):
+    """Log evaluation metrics, comparison table, and artifacts to wandb."""
+    try:
+        import wandb
+    except ImportError:
+        logger.warning("wandb not installed, skipping eval logging")
+        return
+
+    project = wandb_cfg.get("project", "rl-memory-curriculum")
+    entity = wandb_cfg.get("entity")
+
+    run = wandb.init(
+        project=project,
+        entity=entity,
+        job_type="eval",
+        name="evaluation",
+        config={"eval_config": config["evaluation"]},
+    )
+
+    # Log per-model, per-benchmark scalar metrics
+    for model_name, model_results in all_results.items():
+        for bench_name, results in model_results.items():
+            overall = results.get("overall", {})
+            prefix = f"{model_name}/{bench_name}"
+            run.summary[f"{prefix}/f1"] = overall.get("f1", 0)
+            run.summary[f"{prefix}/bleu1"] = overall.get("bleu1", 0)
+            run.summary[f"{prefix}/exact_match"] = overall.get("exact_match", 0)
+            run.summary[f"{prefix}/n"] = overall.get("n", 0)
+
+            # Judge score if available
+            if "judge_score" in overall:
+                run.summary[f"{prefix}/judge_score"] = overall["judge_score"]
+
+    # Build comparison table
+    table_columns = ["Model", "Benchmark", "F1", "BLEU-1", "EM", "N"]
+    table_data = []
+    for model_name, model_results in all_results.items():
+        for bench_name, results in model_results.items():
+            o = results.get("overall", {})
+            table_data.append([
+                model_name, bench_name,
+                round(o.get("f1", 0), 4),
+                round(o.get("bleu1", 0), 4),
+                round(o.get("exact_match", 0), 4),
+                o.get("n", 0),
+            ])
+    if table_data:
+        wandb_table = wandb.Table(columns=table_columns, data=table_data)
+        run.log({"eval/comparison_table": wandb_table})
+
+    # Build per-question-type table
+    type_columns = ["Model", "Benchmark", "Question Type", "F1", "BLEU-1", "EM", "N"]
+    type_data = []
+    for model_name, model_results in all_results.items():
+        for bench_name, results in model_results.items():
+            for qtype, metrics in results.get("per_type", {}).items():
+                type_data.append([
+                    model_name, bench_name, qtype,
+                    round(metrics.get("f1", 0), 4),
+                    round(metrics.get("bleu1", 0), 4),
+                    round(metrics.get("exact_match", 0), 4),
+                    metrics.get("n", 0),
+                ])
+    if type_data:
+        type_table = wandb.Table(columns=type_columns, data=type_data)
+        run.log({"eval/per_type_table": type_table})
+
+    # Log all_results.json as artifact
+    artifact = wandb.Artifact("eval-results", type="eval-results")
+    results_path = output_dir / "all_results.json"
+    if results_path.exists():
+        artifact.add_file(str(results_path))
+    run.log_artifact(artifact)
+
+    run.finish()
+    logger.info("Evaluation results logged to wandb")
 
 
 if __name__ == "__main__":

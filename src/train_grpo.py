@@ -16,10 +16,15 @@ import json
 import logging
 import re
 import os
+import sys
 import yaml
 import torch
 import numpy as np
 from pathlib import Path
+
+# Ensure project root is on sys.path so `from src.xxx` imports work
+# regardless of how the script is invoked (matches eval/run_eval.py pattern).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from datasets import Dataset
 from collections import Counter
 from transformers import TrainerCallback
@@ -51,13 +56,16 @@ class TrainingLogCallback(TrainerCallback):
 
     Output: one JSONL file per training run at `logs/{run_name}_training.jsonl`.
     Each line is a self-contained JSON object — crash-safe, easy to parse with pandas.
+    Also logs to wandb if available.
     """
 
-    def __init__(self, log_dir="logs", agent_type="aa"):
+    def __init__(self, log_dir="logs", agent_type="aa", training_meta=None):
         self.log_dir = Path(log_dir)
         self.agent_type = agent_type
+        self.training_meta = training_meta
         self._file = None
         self._start_time = None
+        self._wandb_available = False
 
     def on_train_begin(self, args, state, control, **kwargs):
         import time
@@ -66,6 +74,16 @@ class TrainingLogCallback(TrainerCallback):
         self._file = open(log_path, "a", encoding="utf-8")
         self._start_time = time.time()
         logger.info(f"Training log: {log_path}")
+
+        # Log training config to wandb if available
+        try:
+            import wandb
+            if wandb.run is not None:
+                self._wandb_available = True
+                if self.training_meta:
+                    wandb.config.update(self.training_meta, allow_val_change=True)
+        except ImportError:
+            pass
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         import time
@@ -399,6 +417,13 @@ def train_answer_agent(config: dict):
     reward_type = config.get("reward", {}).get("type", "f1")
     retrieval_top_k = config.get("retrieval", {}).get("top_k", 20)
 
+    # Configure wandb from config
+    wandb_cfg = config.get("wandb", {})
+    if wandb_cfg.get("enabled", False):
+        os.environ["WANDB_PROJECT"] = wandb_cfg.get("project", "rl-memory-curriculum")
+        if wandb_cfg.get("entity"):
+            os.environ["WANDB_ENTITY"] = wandb_cfg["entity"]
+
     logger.info(f"=== Training Answer Agent: {exp_name} ===")
     logger.info(f"Model: {model_name}")
     logger.info(f"Data: {data_path}")
@@ -431,6 +456,8 @@ def train_answer_agent(config: dict):
                        f"Adjusting group_size to {gen_batch}.")
         group_size = gen_batch
 
+    report_to = "wandb" if wandb_cfg.get("enabled", False) else "tensorboard"
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_aa",
@@ -452,7 +479,7 @@ def train_answer_agent(config: dict):
         save_total_limit=2,
         max_grad_norm=1.0,
         seed=seed,
-        report_to="tensorboard",
+        report_to=report_to,
     )
 
     # Load model
@@ -470,6 +497,24 @@ def train_answer_agent(config: dict):
     # Build reward functions
     aa_reward = make_aa_reward_func(reward_type)
 
+    # Build training metadata for wandb config
+    aa_training_meta = {
+        "model": model_name,
+        "experiment": exp_name,
+        "agent": "answer_agent",
+        "epochs": aa_epochs,
+        "group_size": group_size,
+        "batch_size": batch_size,
+        "gradient_accumulation_steps": grad_accum,
+        "gradient_checkpointing": use_grad_ckpt,
+        "num_examples": len(dataset),
+        "learning_rate": lr,
+        "reward_type": reward_type,
+        "retrieval_top_k": retrieval_top_k,
+        "max_completion_length": max_completion,
+        "use_lora": config["training"].get("use_lora", True),
+    }
+
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
@@ -479,7 +524,7 @@ def train_answer_agent(config: dict):
         peft_config=peft_config,
         callbacks=[
             RewardLoggingCallback(),
-            TrainingLogCallback(agent_type="aa"),
+            TrainingLogCallback(agent_type="aa", training_meta=aa_training_meta),
         ],
     )
 
@@ -531,6 +576,13 @@ def train_memory_manager(config: dict):
     exp_name = config["experiment"]["name"]
     data_path = config["data"]["train_file"]
     seed = config["experiment"]["seed"]
+
+    # Configure wandb from config
+    wandb_cfg = config.get("wandb", {})
+    if wandb_cfg.get("enabled", False):
+        os.environ["WANDB_PROJECT"] = wandb_cfg.get("project", "rl-memory-curriculum")
+        if wandb_cfg.get("entity"):
+            os.environ["WANDB_ENTITY"] = wandb_cfg["entity"]
 
     logger.info(f"=== Training Memory Manager: {exp_name} ===")
 
@@ -765,9 +817,22 @@ Message: {turn['text'][:500]}
                        f"Adjusting group_size to {gen_batch}.")
         group_size = gen_batch
 
+    report_to = "wandb" if wandb_cfg.get("enabled", False) else "tensorboard"
+
+    # Full FT (no LoRA) with beta > 0 requires a reference model copy (~15GB extra).
+    # Use 8-bit Adam to reduce optimizer states from ~61GB to ~15GB so everything
+    # fits in a single 80GB GPU.
+    use_lora = config["training"].get("use_lora", True)
+    if not use_lora:
+        optim = "adamw_bnb_8bit"
+        logger.info("Full FT + reference model: using adamw_bnb_8bit to fit in GPU memory")
+    else:
+        optim = "adamw_torch_fused"
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_mm",
+        optim=optim,
         learning_rate=lr,
         adam_beta1=0.9,
         adam_beta2=0.99,
@@ -787,7 +852,7 @@ Message: {turn['text'][:500]}
         max_grad_norm=1.0,
         beta=0.04,
         seed=seed,
-        report_to="tensorboard",
+        report_to=report_to,
     )
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -801,6 +866,22 @@ Message: {turn['text'][:500]}
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Build training metadata for wandb config
+    mm_training_meta = {
+        "model": model_name,
+        "experiment": exp_name,
+        "agent": "memory_manager",
+        "epochs": mm_epochs,
+        "group_size": group_size,
+        "batch_size": batch_size,
+        "gradient_accumulation_steps": grad_accum,
+        "gradient_checkpointing": use_grad_ckpt,
+        "num_examples": len(dataset),
+        "learning_rate": lr,
+        "max_completion_length": max_completion,
+        "use_lora": config["training"].get("use_lora", True),
+    }
+
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
@@ -811,7 +892,7 @@ Message: {turn['text'][:500]}
         callbacks=[
             RewardLoggingCallback(),
             RewardVarianceEarlyStopCallback(),
-            TrainingLogCallback(agent_type="mm"),
+            TrainingLogCallback(agent_type="mm", training_meta=mm_training_meta),
         ],
     )
 
@@ -854,6 +935,9 @@ def load_config(config_path: str) -> dict:
 
 
 def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Train Memory-R1 with GRPO")
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--agent", type=str, default="both",

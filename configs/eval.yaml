@@ -66,3 +66,8 @@ evaluation:
     top_k: 60
 
   output_dir: "results/"
+
+wandb:
+  project: "rl-memory-curriculum"
+  entity: null
+  enabled: true

@@ -31,3 +31,8 @@ reward:
 
 retrieval:
   top_k: 60
+
+wandb:
+  project: "rl-memory-curriculum"
+  entity: null
+  enabled: true
