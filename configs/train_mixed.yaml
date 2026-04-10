@@ -1,11 +1,11 @@
 # Config B: Mixed curriculum (LoCoMo + LongMemEval)
-# Default: Qwen3.5-4B + LoRA via Unsloth, ~10GB VRAM
+# Default: Qwen2.5-7B-Instruct + LoRA, ~10GB VRAM
 experiment:
   name: "config_b_mixed"
   seed: 42
 
 model:
-  name: "unsloth/Qwen3.5-4B"
+  name: "Qwen/Qwen2.5-7B-Instruct"
 
 data:
   train_file: "data/processed/mixed_train.jsonl"
