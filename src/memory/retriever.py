@@ -20,13 +20,15 @@ _tokenizer = None
 
 
 def get_embedder(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
-    """Lazy-load the sentence transformer model on CPU to avoid GPU memory pressure."""
+    """Lazy-load the sentence transformer model, preferring GPU when available."""
     global _model
     if _model is None:
         try:
+            import torch
             from sentence_transformers import SentenceTransformer
-            _model = SentenceTransformer(model_name, device="cpu")
-            logger.info(f"Loaded embedding model: {model_name} (device=cpu)")
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _model = SentenceTransformer(model_name, device=device)
+            logger.info(f"Loaded embedding model: {model_name} (device={device})")
         except ImportError:
             logger.warning(
                 "sentence-transformers not installed. "

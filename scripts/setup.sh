@@ -16,6 +16,10 @@ fi
 echo "Syncing dependencies with uv..."
 uv sync
 
+# Patch trl for transformers 5.x compatibility
+echo "Applying dependency patches..."
+uv run python scripts/patch_deps.py
+
 # Pre-download tokenizer (model weights download on first training run)
 echo "Pre-downloading tokenizer..."
 uv run python3 -c "

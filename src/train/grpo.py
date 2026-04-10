@@ -16,6 +16,8 @@ import argparse
 import json
 import logging
 
+import unsloth  # Must be imported before trl/transformers/peft (applies optimizations)  # noqa: F401
+
 from src.common.config import load_config
 from src.train.callbacks import (
     RewardLoggingCallback,

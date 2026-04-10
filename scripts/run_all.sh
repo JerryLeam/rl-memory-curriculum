@@ -78,6 +78,11 @@ print(f'GPU: {name} ({vram:.1f} GB)')
 "
 echo ""
 
+# 0b. Patch deps for transformers 5.x compatibility
+echo "=== Step 0b: Dependency Patches ==="
+uv run python scripts/patch_deps.py
+echo ""
+
 # Build dry-run flags
 EVAL_EXTRA=""
 if [ "$DRY_RUN" = true ]; then
