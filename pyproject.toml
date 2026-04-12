@@ -17,16 +17,16 @@ dependencies = [
     "sentence-transformers>=3.0.0",
     "tensorboard>=2.0.0",
     "torch>=2.1.0",
-    "transformers>=5.2.0",
+    "transformers>=4.25.0",
     "trl==0.22.2",
     "unsloth",
     "unsloth_zoo",
 ]
 
-# [project.optional-dependencies]
-# vllm requires transformers<5, but Qwen3.5 needs transformers>=5.2.0.
+[project.optional-dependencies]
+# vllm requires transformers<5, but Qwen2.5-7B-Instruct needs transformers>=4.25.0.
 # Re-enable when vllm adds transformers 5.x support.
-# vllm = ["vllm>=0.17.0"]
+vllm = ["vllm>=0.17.0"]
 
 [tool.uv]
 # Keep a local virtual environment in the repository root.
