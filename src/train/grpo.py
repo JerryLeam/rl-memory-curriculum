@@ -1,7 +1,7 @@
 """
-GRPO training for Memory-R1 Answer Agent and Memory Manager using TRL.
+GRPO training for Memory-R1 Answer Agent and Memory Manager using TRL + Unsloth.
 
-Uses HuggingFace Transformers + PEFT + TRL for training Qwen2.5-7B-Instruct.
+Uses Unsloth's FastLanguageModel for efficient training of Qwen3.5-4B.
 Supports both LoRA and full fine-tuning, controlled by YAML config.
 No code changes needed between configurations.
 
@@ -16,13 +16,15 @@ import argparse
 import json
 import logging
 
+import unsloth  # Must be imported before trl/transformers/peft (applies optimizations)  # noqa: F401
+
 from src.common.config import load_config
 from src.train.callbacks import (
     RewardLoggingCallback,
     TrainingLogCallback,
     RewardVarianceEarlyStopCallback,
 )
-from src.train.model import load_model
+from src.train.model import load_model_unsloth
 from src.train.rewards import (
     make_aa_reward_func,
     format_reward_func,
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_answer_agent(config: dict):
-    """Train Answer Agent with GRPO via TRL."""
+    """Train Answer Agent with GRPO via TRL + Unsloth."""
     from trl import GRPOConfig, GRPOTrainer
 
     model_name = config["model"]["name"]
@@ -98,8 +100,8 @@ def train_answer_agent(config: dict):
         report_to="tensorboard",
     )
 
-    # Load model and tokenizer
-    model, tokenizer = load_model(config)
+    # Load model via Unsloth
+    model, tokenizer = load_model_unsloth(config, max_seq_length=max_seq_length)
 
     # Build reward functions
     aa_reward = make_aa_reward_func(reward_type)
@@ -120,7 +122,8 @@ def train_answer_agent(config: dict):
     trainer.train()
 
     # Save
-    trainer.save_model(output_dir)
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
 
     # Save training metadata
     use_lora = config["training"].get("use_lora", True)
@@ -143,6 +146,7 @@ def train_answer_agent(config: dict):
         "use_lora": use_lora,
         "lora_r": lora_r if use_lora else None,
         "lora_alpha": lora_alpha if use_lora else None,
+        "unsloth": True,
     }
     with open(f"{output_dir}/training_meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -152,7 +156,7 @@ def train_answer_agent(config: dict):
 
 def train_memory_manager(config: dict):
     """
-    Train Memory Manager with GRPO via TRL.
+    Train Memory Manager with GRPO via TRL + Unsloth.
 
     Single-turn: each prompt is a dialogue turn + current memory state.
     Reward = format correctness of CRUD operation.
@@ -214,8 +218,8 @@ def train_memory_manager(config: dict):
         report_to="tensorboard",
     )
 
-    # Load model and tokenizer
-    model, tokenizer = load_model(config)
+    # Load model via Unsloth
+    model, tokenizer = load_model_unsloth(config, max_seq_length=max_seq_length)
 
     trainer = GRPOTrainer(
         model=model,
@@ -233,7 +237,8 @@ def train_memory_manager(config: dict):
     logger.info("Starting MM GRPO training...")
     trainer.train()
 
-    trainer.save_model(output_dir)
+    model.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
 
     use_lora = config["training"].get("use_lora", True)
     lora_r = config["training"].get("lora_rank", 16)
@@ -253,6 +258,7 @@ def train_memory_manager(config: dict):
         "use_lora": use_lora,
         "lora_r": lora_r if use_lora else None,
         "lora_alpha": lora_alpha if use_lora else None,
+        "unsloth": True,
     }
     with open(f"{output_dir}/training_meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)

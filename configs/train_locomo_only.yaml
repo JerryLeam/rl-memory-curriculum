@@ -1,11 +1,11 @@
 # Config A: LoCoMo-only training (Memory-R1 baseline curriculum)
-# Default: Qwen2.5-7B-Instruct + LoRA, ~10GB VRAM
+# Default: Qwen3.5-4B + LoRA via Unsloth, ~10GB VRAM
 experiment:
   name: "config_a_locomo_only"
   seed: 42
 
 model:
-  name: "Qwen/Qwen2.5-7B-Instruct"
+  name: "unsloth/Qwen3.5-4B"
 
 data:
   train_file: "data/processed/locomo_train.jsonl"

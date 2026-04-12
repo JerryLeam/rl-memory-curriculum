@@ -19,6 +19,8 @@ dependencies = [
     "torch>=2.1.0",
     "transformers>=5.2.0",
     "trl==0.22.2",
+    "unsloth",
+    "unsloth_zoo",
 ]
 
 # [project.optional-dependencies]
