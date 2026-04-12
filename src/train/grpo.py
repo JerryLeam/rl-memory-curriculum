@@ -1,7 +1,7 @@
 """
 GRPO training for Memory-R1 Answer Agent and Memory Manager using TRL + Unsloth.
 
-Uses Unsloth's FastLanguageModel for efficient training of Qwen3.5-4B.
+Uses Unsloth's FastLanguageModel for efficient training of Qwen2.5-7B-Instruct.
 Supports both LoRA and full fine-tuning, controlled by YAML config.
 No code changes needed between configurations.
 

@@ -24,7 +24,7 @@ uv run python scripts/patch_deps.py
 echo "Pre-downloading tokenizer..."
 uv run python3 -c "
 from transformers import AutoTokenizer
-tok = AutoTokenizer.from_pretrained('unsloth/Qwen3.5-4B')
+tok = AutoTokenizer.from_pretrained('unsloth/Qwen2.5-7B-Instruct')
 print(f'Tokenizer ready: vocab_size={tok.vocab_size}')
 "
 

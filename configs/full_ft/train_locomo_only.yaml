@@ -1,11 +1,11 @@
 # Config A (Full FT): LoCoMo-only training (Memory-R1 baseline curriculum)
-# Qwen3.5-4B full fine-tuning via Unsloth, ~40GB VRAM
+# Qwen2.5-7B-Instruct full fine-tuning via Unsloth, ~40GB VRAM
 experiment:
   name: "config_a_locomo_only"
   seed: 42
 
 model:
-  name: "unsloth/Qwen3.5-4B"
+  name: "unsloth/Qwen2.5-7B-Instruct"
 
 data:
   train_file: "data/processed/locomo_train.jsonl"
