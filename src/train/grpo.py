@@ -36,6 +36,46 @@ from src.train.datasets import load_training_data, prepare_aa_dataset, prepare_m
 logger = logging.getLogger(__name__)
 
 
+def _configure_wandb(wandb_cfg: dict) -> bool:
+    """Set wandb env vars and verify the API key.
+
+    Returns True if wandb is ready to use, False otherwise (so callers can
+    fall back to tensorboard without crashing the training run).
+    """
+    import os
+    if not wandb_cfg.get("enabled", False):
+        return False
+
+    try:
+        import wandb
+    except ImportError:
+        logger.warning("wandb not installed — falling back to tensorboard. "
+                       "Install with: uv add wandb")
+        return False
+
+    api_key = os.environ.get("WANDB_API_KEY", "")
+    if not api_key or api_key == "your_wandb_api_key_here":
+        logger.warning(
+            "WANDB_API_KEY is missing or still the placeholder value. "
+            "Set it in .env (copy .env.example) — falling back to tensorboard."
+        )
+        return False
+
+    os.environ["WANDB_PROJECT"] = wandb_cfg.get("project", "rl-memory-curriculum")
+    if wandb_cfg.get("entity"):
+        os.environ["WANDB_ENTITY"] = wandb_cfg["entity"]
+
+    # Verify the key is valid before handing control to TRL
+    try:
+        api = wandb.Api(api_key=api_key)
+        _ = api.viewer  # lightweight authenticated request
+    except Exception as e:
+        logger.warning(f"wandb authentication failed ({e}) — falling back to tensorboard.")
+        return False
+
+    return True
+
+
 def train_answer_agent(config: dict):
     """Train Answer Agent with GRPO via TRL + Unsloth."""
     from trl import GRPOConfig, GRPOTrainer
@@ -76,6 +116,9 @@ def train_answer_agent(config: dict):
                        f"Adjusting group_size to {gen_batch}.")
         group_size = gen_batch
 
+    wandb_cfg = config.get("wandb", {})
+    report_to = "wandb" if _configure_wandb(wandb_cfg) else "tensorboard"
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_aa",
@@ -97,7 +140,7 @@ def train_answer_agent(config: dict):
         save_total_limit=2,
         max_grad_norm=1.0,
         seed=seed,
-        report_to="tensorboard",
+        report_to=report_to,
     )
 
     # Load model via Unsloth
@@ -105,6 +148,22 @@ def train_answer_agent(config: dict):
 
     # Build reward functions
     aa_reward = make_aa_reward_func(reward_type)
+
+    aa_training_meta = {
+        "model": model_name,
+        "experiment": exp_name,
+        "agent": "answer_agent",
+        "epochs": aa_epochs,
+        "group_size": group_size,
+        "batch_size": batch_size,
+        "gradient_accumulation_steps": grad_accum,
+        "num_examples": len(dataset),
+        "learning_rate": lr,
+        "reward_type": reward_type,
+        "retrieval_top_k": retrieval_top_k,
+        "max_completion_length": max_completion,
+        "use_lora": config["training"].get("use_lora", True),
+    }
 
     trainer = GRPOTrainer(
         model=model,
@@ -114,7 +173,7 @@ def train_answer_agent(config: dict):
         train_dataset=dataset,
         callbacks=[
             RewardLoggingCallback(),
-            TrainingLogCallback(agent_type="aa"),
+            TrainingLogCallback(agent_type="aa", training_meta=aa_training_meta),
         ],
     )
 
@@ -193,6 +252,9 @@ def train_memory_manager(config: dict):
                        f"Adjusting group_size to {gen_batch}.")
         group_size = gen_batch
 
+    wandb_cfg = config.get("wandb", {})
+    report_to = "wandb" if _configure_wandb(wandb_cfg) else "tensorboard"
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_mm",
@@ -215,11 +277,25 @@ def train_memory_manager(config: dict):
         max_grad_norm=1.0,
         beta=0.04,
         seed=seed,
-        report_to="tensorboard",
+        report_to=report_to,
     )
 
     # Load model via Unsloth
     model, tokenizer = load_model_unsloth(config, max_seq_length=max_seq_length)
+
+    mm_training_meta = {
+        "model": model_name,
+        "experiment": exp_name,
+        "agent": "memory_manager",
+        "epochs": mm_epochs,
+        "group_size": group_size,
+        "batch_size": batch_size,
+        "gradient_accumulation_steps": grad_accum,
+        "num_examples": len(dataset),
+        "learning_rate": lr,
+        "max_completion_length": max_completion,
+        "use_lora": config["training"].get("use_lora", True),
+    }
 
     trainer = GRPOTrainer(
         model=model,
@@ -230,7 +306,7 @@ def train_memory_manager(config: dict):
         callbacks=[
             RewardLoggingCallback(),
             RewardVarianceEarlyStopCallback(),
-            TrainingLogCallback(agent_type="mm"),
+            TrainingLogCallback(agent_type="mm", training_meta=mm_training_meta),
         ],
     )
 
@@ -267,6 +343,9 @@ def train_memory_manager(config: dict):
 
 
 def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Train Memory-R1 with GRPO")
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--agent", type=str, default="both",

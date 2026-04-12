@@ -12,6 +12,7 @@ dependencies = [
     "openai>=1.0.0",
     "pandas>=2.0.0",
     "peft>=0.14.0",
+    "python-dotenv>=1.0.0",
     "pyyaml",
     "scikit-learn>=1.3.0",
     "sentence-transformers>=3.0.0",
@@ -21,6 +22,7 @@ dependencies = [
     "trl==0.22.2",
     "unsloth",
     "unsloth_zoo",
+    "wandb>=0.18.0",
 ]
 
 [project.optional-dependencies]

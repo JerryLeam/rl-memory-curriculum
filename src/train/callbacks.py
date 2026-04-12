@@ -29,13 +29,16 @@ class TrainingLogCallback(TrainerCallback):
 
     Output: one JSONL file per training run at `logs/{run_name}_training.jsonl`.
     Each line is a self-contained JSON object — crash-safe, easy to parse with pandas.
+    Also logs to wandb if available.
     """
 
-    def __init__(self, log_dir="logs", agent_type="aa"):
+    def __init__(self, log_dir="logs", agent_type="aa", training_meta=None):
         self.log_dir = Path(log_dir)
         self.agent_type = agent_type
+        self.training_meta = training_meta
         self._file = None
         self._start_time = None
+        self._wandb_available = False
 
     def on_train_begin(self, args, state, control, **kwargs):
         import time
@@ -44,6 +47,16 @@ class TrainingLogCallback(TrainerCallback):
         self._file = open(log_path, "a", encoding="utf-8")
         self._start_time = time.time()
         logger.info(f"Training log: {log_path}")
+
+        # Log training config to wandb if available
+        try:
+            import wandb
+            if wandb.run is not None:
+                self._wandb_available = True
+                if self.training_meta:
+                    wandb.config.update(self.training_meta, allow_val_change=True)
+        except ImportError:
+            pass
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         import time
