@@ -15,7 +15,7 @@ training:
   algorithm: "grpo"
   use_lora: false
   gradient_checkpointing: true
-  max_seq_length: 2048
+  max_seq_length: 8192
   batch_size: 2
   group_size: 4
   learning_rate: 1.0e-6

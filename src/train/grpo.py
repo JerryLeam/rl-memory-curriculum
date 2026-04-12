@@ -23,6 +23,7 @@ from src.train.callbacks import (
     RewardLoggingCallback,
     TrainingLogCallback,
     RewardVarianceEarlyStopCallback,
+    WandbSampleTableCallback,
 )
 from src.train.model import load_model_unsloth
 from src.train.rewards import (
@@ -30,7 +31,10 @@ from src.train.rewards import (
     format_reward_func,
     mm_format_reward,
     make_mm_quality_reward,
+    SampleLogger,
+    wrap_reward_func,
 )
+from src.agents.answer_agent import extract_answer_from_completion
 from src.train.datasets import load_training_data, prepare_aa_dataset, prepare_mm_dataset
 
 logger = logging.getLogger(__name__)
@@ -146,8 +150,16 @@ def train_answer_agent(config: dict):
     # Load model via Unsloth
     model, tokenizer = load_model_unsloth(config, max_seq_length=max_seq_length)
 
-    # Build reward functions
-    aa_reward = make_aa_reward_func(reward_type)
+    # Build reward functions with sample logging for wandb Table
+    aa_sample_logger = SampleLogger()
+    aa_reward_names = ["aa_reward", "format_reward"]
+    aa_reward = wrap_reward_func(
+        make_aa_reward_func(reward_type), "aa_reward", aa_sample_logger,
+        extract_fn=extract_answer_from_completion,
+    )
+    aa_format_reward = wrap_reward_func(
+        format_reward_func, "format_reward", aa_sample_logger,
+    )
 
     aa_training_meta = {
         "model": model_name,
@@ -168,12 +180,13 @@ def train_answer_agent(config: dict):
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
-        reward_funcs=[aa_reward, format_reward_func],
+        reward_funcs=[aa_reward, aa_format_reward],
         args=training_args,
         train_dataset=dataset,
         callbacks=[
             RewardLoggingCallback(),
             TrainingLogCallback(agent_type="aa", training_meta=aa_training_meta),
+            WandbSampleTableCallback(aa_sample_logger, aa_reward_names),
         ],
     )
 
@@ -234,8 +247,15 @@ def train_memory_manager(config: dict):
     train_data = load_training_data(data_path)
     dataset = prepare_mm_dataset(train_data, config)
 
-    # Build reward functions
-    mm_quality_reward = make_mm_quality_reward()
+    # Build reward functions with sample logging for wandb Table
+    mm_sample_logger = SampleLogger()
+    mm_reward_names = ["mm_format", "mm_quality"]
+    mm_fmt_reward = wrap_reward_func(
+        mm_format_reward, "mm_format", mm_sample_logger,
+    )
+    mm_quality_reward = wrap_reward_func(
+        make_mm_quality_reward(), "mm_quality", mm_sample_logger,
+    )
 
     mm_epochs = config["training"].get("mm_epochs", 2)
     group_size = config["training"].get("group_size", 4)
@@ -300,13 +320,14 @@ def train_memory_manager(config: dict):
     trainer = GRPOTrainer(
         model=model,
         processing_class=tokenizer,
-        reward_funcs=[mm_format_reward, mm_quality_reward],
+        reward_funcs=[mm_fmt_reward, mm_quality_reward],
         args=training_args,
         train_dataset=dataset,
         callbacks=[
             RewardLoggingCallback(),
             RewardVarianceEarlyStopCallback(),
             TrainingLogCallback(agent_type="mm", training_meta=mm_training_meta),
+            WandbSampleTableCallback(mm_sample_logger, mm_reward_names),
         ],
     )
 

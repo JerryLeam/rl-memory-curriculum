@@ -26,8 +26,9 @@ def load_model_unsloth(config: dict, max_seq_length: int = 2048):
         max_seq_length=max_seq_length,
         load_in_4bit=False,
         load_in_16bit=True,
-        fast_inference=False,  # Qwen3.5 not supported by vLLM yet
+        fast_inference=False,  # Full Training doesn't support vLLM yet
         full_finetuning=not use_lora,
+        use_gradient_checkpointing="unsloth",
     )
 
     if use_lora:

@@ -17,7 +17,7 @@ training:
   lora_rank: 16
   lora_alpha: 16
   gradient_checkpointing: true
-  max_seq_length: 2048
+  max_seq_length: 8192
   batch_size: 1
   group_size: 4
   learning_rate: 5.0e-6

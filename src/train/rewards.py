@@ -8,11 +8,88 @@ that TRL expects.
 import json
 import logging
 import re
+import threading
 
 from src.common.scoring import normalize_answer, token_f1, exact_match
 from src.agents.answer_agent import extract_answer_from_completion
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Sample logging for wandb Table reward decomposition
+# ---------------------------------------------------------------------------
+
+class SampleLogger:
+    """Thread-safe buffer that reward wrappers write into and the callback drains."""
+
+    def __init__(self):
+        self._buffer: list[dict] = []
+        self._lock = threading.Lock()
+
+    def log(self, records: list[dict]):
+        with self._lock:
+            self._buffer.extend(records)
+
+    def drain(self) -> list[dict]:
+        with self._lock:
+            out = self._buffer
+            self._buffer = []
+            return out
+
+
+def wrap_reward_func(fn, name: str, sample_logger: SampleLogger, extract_fn=None):
+    """Return a wrapper that calls *fn* unchanged but logs each sample's score.
+
+    Parameters
+    ----------
+    fn : callable
+        Original reward function with TRL signature.
+    name : str
+        Column name for this reward in the wandb Table.
+    sample_logger : SampleLogger
+        Shared buffer that the WandbSampleTableCallback drains.
+    extract_fn : callable | None
+        If provided (AA case), called on the raw completion to record
+        the extracted answer alongside the score.
+    """
+
+    def wrapper(completions, answer=None, **kwargs) -> list[float]:
+        scores = fn(completions, **({'answer': answer} if answer is not None else {}), **kwargs)
+        # Extract prompts passed by TRL via kwargs
+        prompts = kwargs.get("prompts", [])
+        records = []
+        for i, (completion, score) in enumerate(zip(completions, scores)):
+            response = completion[0]["content"] if isinstance(completion, list) else str(completion)
+            gold = answer[i] if answer is not None and i < len(answer) else ""
+            # Get the prompt (last user message if chat format, else raw string)
+            prompt_text = ""
+            if i < len(prompts):
+                p = prompts[i]
+                if isinstance(p, list):
+                    # Build full prompt: system + user messages
+                    parts = []
+                    for m in p:
+                        role = m.get("role", "unknown")
+                        content = m.get("content", "")
+                        parts.append(f"[{role}]\n{content}")
+                    prompt_text = "\n\n".join(parts) if parts else str(p)
+                else:
+                    prompt_text = str(p)
+            rec = {
+                "prompt": prompt_text,
+                "completion": response,
+                "gold": gold,
+                "reward_name": name,
+                "score": score,
+            }
+            if extract_fn is not None:
+                rec["extracted_answer"] = extract_fn(response)
+            records.append(rec)
+        sample_logger.log(records)
+        return scores
+
+    return wrapper
 
 
 def make_aa_reward_func(reward_type: str = "f1"):

@@ -23,6 +23,7 @@ dependencies = [
     "unsloth",
     "unsloth_zoo",
     "wandb>=0.18.0",
+    "vllm>=0.17.0"
 ]
 
 [project.optional-dependencies]

@@ -49,3 +49,4 @@ checkpoints
 remote_results
 unsloth_compiled_cache
 logs
+wandb
