@@ -11,6 +11,7 @@ Usage:
     # Train both agents with full FT (≥80GB GPU)
     python src/train_grpo.py --config configs/full_ft/train_locomo_only.yaml --agent both
 """
+from unsloth import FastLanguageModel
 import argparse
 import json
 import logging
@@ -29,6 +30,7 @@ from datasets import Dataset
 from collections import Counter
 from transformers import TrainerCallback
 
+os.environ["UNSLOTH_IS_OFFLINE"] = "1"
 logger = logging.getLogger(__name__)
 
 
@@ -483,16 +485,42 @@ def train_answer_agent(config: dict):
     )
 
     # Load model
-    model = AutoModelForCausalLM.from_pretrained(
+    # full_finetuning=True routes through FastModel (torch.compile path) which does NOT
+    # apply the class-level Qwen2Attention.forward = LlamaAttention_fast_forward patch.
+    # Without this, TRL's internally-created reference model (plain AutoModelForCausalLM)
+    # inherits that class-level patch but lacks the per-instance apply_qkv attribute →
+    # AttributeError at training time.
+    use_lora = config["training"].get("use_lora", True)
+    max_seq_length = config["training"].get("max_seq_length", 4096)
+    model, tokenizer = FastLanguageModel.from_pretrained(
         model_name,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="sdpa",
-        device_map=None,
-    ).to("cuda")
-
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+        max_seq_length=max_seq_length,
+        load_in_4bit=False,
+        load_in_16bit=True,
+        fast_inference=False,  # Required for GRPO training
+        full_finetuning=not use_lora,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    if use_lora:
+        lora_r = config["training"].get("lora_rank", 16)
+        lora_alpha = config["training"].get("lora_alpha", 16)
+        logger.info(f"Applying LoRA (r={lora_r}, alpha={lora_alpha})")
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=lora_r,
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj",
+            ],
+            lora_alpha=lora_alpha,
+            lora_dropout=0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=seed,
+            max_seq_length=max_seq_length,
+        )
 
     # Build reward functions
     aa_reward = make_aa_reward_func(reward_type)

@@ -19,9 +19,11 @@ dependencies = [
     "tensorboard>=2.20.0",
     "torch>=2.1.0",
     "transformers>=4.48.0",
-    "trl>=1.0.0",
-    "vllm==0.17.1",
+    "trl>=0.20.0",
+    "vllm>=0.17.1",
     "wandb>=0.18.0",
+    "unsloth <= 2026.3.18",
+    "unsloth_zoo <= 2026.3.18",
 ]
 
 [tool.uv]

@@ -23,6 +23,7 @@ training:
   train_memory_manager: true
   aa_epochs: 3
   mm_epochs: 3
+  max_seq_length: 4096
   aa_max_completion_length: 1024
   mm_max_completion_length: 256
 
