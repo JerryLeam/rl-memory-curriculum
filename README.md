@@ -156,11 +156,53 @@ rl-memory-curriculum/
 │   │   ├── metrics.py               #   F1, BLEU-1, EM computation
 │   │   ├── judge.py                 #   LLM-as-Judge scoring
 │   │   └── analyze.py               #   Results analysis + table gen
+│   ├── tester.py                    # Eager tester — run N examples interactively
 │   └── pipeline.py                  # End-to-end inference
-├── scripts/                         # setup.sh, run_all.sh
+├── scripts/                         # setup.sh, run_all.sh, run_eager.bat/.sh
 ├── results/                         # Phase 1 reference results
 └── paper/                           # Figures and tables
 ```
+
+## Eager Tester
+
+Quickly test the baseline or any checkpoint on a handful of LoCoMo examples without
+running the full evaluation pipeline. Results are printed to the console.
+
+```bash
+# Baseline — 5 examples (default)
+uv run python -m src.tester
+
+# Custom number of examples
+uv run python -m src.tester -n 10
+
+# Run against a trained checkpoint
+uv run python -m src.tester --checkpoint checkpoints/config_a_locomo_only/answer_agent
+
+# Use a trained Memory Manager instead of heuristic memory
+uv run python -m src.tester \
+  --checkpoint checkpoints/config_a_locomo_only/answer_agent \
+  --mm-checkpoint checkpoints/config_a_locomo_only/memory_manager
+
+# Windows shortcut
+scripts\run_eager.bat -n 5
+```
+
+All flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--checkpoint` | `unsloth/Qwen2.5-7B-Instruct` | Answer-agent model path or HF name |
+| `--base-model` | `unsloth/Qwen2.5-7B-Instruct` | Base model for LoRA adapters |
+| `-n` / `--num-examples` | `5` | Number of examples to run |
+| `--data-file` | `data/processed/locomo_test.jsonl` | Input JSONL |
+| `--top-k` | `20` | Retrieval top-k memories |
+| `--max-new-tokens` | `512` | Generation token budget |
+| `--mm-checkpoint` | _(none — uses heuristic)_ | Trained Memory Manager checkpoint |
+| `--temperature` | `0.3` | Generation temperature |
+
+The tester auto-detects LoRA vs full-FT checkpoints from `training_meta.json`,
+groups examples by conversation so memories are built once per conversation,
+and prints per-example F1 / BLEU-1 / EM plus aggregate averages at the end.
 
 ## Metrics
 
