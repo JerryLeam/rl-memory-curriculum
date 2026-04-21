@@ -12,9 +12,12 @@ Usage:
     # Train both agents with full FT (≥40GB GPU)
     python src/train_grpo.py --config configs/full_ft/train_locomo_only.yaml --agent both
 """
+# import unsloth  # must be first to patch transformers/trl before they are imported
+from unsloth import FastLanguageModel
 import argparse
 import json
 import logging
+import math
 import re
 import os
 import sys
@@ -393,7 +396,6 @@ def load_model_unsloth(config: dict, max_seq_length: int = 2048):
     Handles both LoRA and full fine-tuning.
     Qwen3.5 is not yet supported by vLLM, so fast_inference is disabled.
     """
-    from unsloth import FastLanguageModel
 
     model_name = config["model"]["name"]
     use_lora = config["training"].get("use_lora", True)
@@ -470,6 +472,7 @@ def train_answer_agent(config: dict):
     lr = config["training"].get("learning_rate", 5e-6)
     max_completion = config["training"].get("aa_max_completion_length", 512)
     max_seq_length = config["training"].get("max_seq_length", 2048)
+    use_grad_ckpt = config["training"].get("gradient_checkpointing", True)
 
     output_dir = f"checkpoints/{exp_name}/answer_agent"
 
@@ -482,6 +485,9 @@ def train_answer_agent(config: dict):
 
     report_to = "wandb" if wandb_cfg.get("enabled", False) else "tensorboard"
 
+    total_steps = math.ceil(len(dataset) / (batch_size * grad_accum)) * aa_epochs
+    warmup_steps = max(1, int(0.1 * total_steps))
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_aa",
@@ -489,13 +495,13 @@ def train_answer_agent(config: dict):
         adam_beta1=0.9,
         adam_beta2=0.99,
         weight_decay=0.1,
-        warmup_ratio=0.1,
+        warmup_steps=warmup_steps,
         lr_scheduler_type="cosine",
         logging_steps=5,
         bf16=True,
         per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
-        gradient_checkpointing=True,
+        gradient_checkpointing=use_grad_ckpt,
         num_generations=group_size,
         max_completion_length=max_completion,
         num_train_epochs=aa_epochs,
@@ -843,6 +849,9 @@ Message: {turn['text'][:500]}
     else:
         optim = "adamw_torch_fused"
 
+    total_steps = math.ceil(len(dataset) / (batch_size * grad_accum)) * mm_epochs
+    warmup_steps = max(1, int(0.1 * total_steps))
+
     training_args = GRPOConfig(
         output_dir=output_dir,
         run_name=f"{exp_name}_mm",
@@ -851,7 +860,7 @@ Message: {turn['text'][:500]}
         adam_beta1=0.9,
         adam_beta2=0.99,
         weight_decay=0.1,
-        warmup_ratio=0.1,
+        warmup_steps=warmup_steps,
         lr_scheduler_type="cosine",
         logging_steps=5,
         bf16=True,

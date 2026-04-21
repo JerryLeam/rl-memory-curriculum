@@ -47,3 +47,5 @@ results/*_predictions.jsonl
 results/judge_done.flag
 checkpoints
 remote_results
+unsloth_compiled_cache
+wandb

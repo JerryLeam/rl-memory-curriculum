@@ -13,35 +13,35 @@ evaluation:
   models:
     # 1. Baseline: no RL
     - name: "baseline_no_rl"
-      checkpoint: "unsloth/Qwen3.5-4B"
+      checkpoint: "unsloth/Qwen2.5-7B-Instruct"
       is_baseline: true
 
     # 2-4. AA-only (no MM training)
     - name: "config_a_aa_only"
       checkpoint: "checkpoints/config_a_locomo_only/answer_agent/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
     - name: "config_b_aa_only"
       checkpoint: "checkpoints/config_b_mixed/answer_agent/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
     - name: "config_c_aa_only"
       checkpoint: "checkpoints/config_c_longmemeval_only/answer_agent/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
 
     # 5-7. AA+MM (full pipeline)
     - name: "config_a_full"
       checkpoint: "checkpoints/config_a_locomo_only/answer_agent/"
       mm_checkpoint: "checkpoints/config_a_locomo_only/memory_manager/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
       use_mm: true
     - name: "config_b_full"
       checkpoint: "checkpoints/config_b_mixed/answer_agent/"
       mm_checkpoint: "checkpoints/config_b_mixed/memory_manager/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
       use_mm: true
     - name: "config_c_full"
       checkpoint: "checkpoints/config_c_longmemeval_only/answer_agent/"
       mm_checkpoint: "checkpoints/config_c_longmemeval_only/memory_manager/"
-      base_model: "unsloth/Qwen3.5-4B"
+      base_model: "unsloth/Qwen2.5-7B-Instruct"
       use_mm: true
 
   metrics:
