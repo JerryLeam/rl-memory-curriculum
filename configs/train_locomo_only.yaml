@@ -29,7 +29,7 @@ training:
   mm_max_completion_length: 256
 
 reward:
-  type: "em"
+  type: "f1"
 
 retrieval:
   top_k: 60
