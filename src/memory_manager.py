@@ -48,9 +48,17 @@ from src.memory_bank import MemoryBank
 
 
 def build_mm_prompt(memory_bank: MemoryBank, session_id: int,
-                    turn_id: int, speaker: str, message: str) -> list[dict]:
-    """Build the prompt for the Memory Manager."""
-    memories_str = memory_bank.format_for_prompt()
+                    turn_id: int, speaker: str, message: str,
+                    entries=None) -> list[dict]:
+    """Build the prompt for the Memory Manager.
+
+    entries: optional list of MemoryEntry to render in place of the full bank.
+             Callers use this to cap prompt length when the bank has grown large.
+    """
+    if entries is not None:
+        memories_str = memory_bank.format_for_prompt(entries=entries)
+    else:
+        memories_str = memory_bank.format_for_prompt()
     user_msg = MEMORY_MANAGER_USER_TEMPLATE.format(
         memories=memories_str,
         session_id=session_id,
@@ -62,6 +70,39 @@ def build_mm_prompt(memory_bank: MemoryBank, session_id: int,
         {"role": "system", "content": MEMORY_MANAGER_SYSTEM},
         {"role": "user", "content": user_msg},
     ]
+
+
+def build_mm_text_with_budget(tokenizer, memory_bank, session_id, turn_id,
+                              speaker, message, max_prompt_tokens=30000):
+    """Render the MM chat-template prompt, falling back to the most recent
+    subset of memories if the full bank would overflow ``max_prompt_tokens``.
+
+    Prevents VLLMValidationError (input > max_model_len) when memory banks
+    accumulate beyond the model's context length during long-conversation eval.
+    """
+    messages = build_mm_prompt(memory_bank, session_id=session_id, turn_id=turn_id,
+                               speaker=speaker, message=message)
+    text = tokenizer.apply_chat_template(messages, tokenize=False,
+                                         add_generation_prompt=True)
+    n_toks = len(tokenizer.encode(text, add_special_tokens=False))
+    if n_toks <= max_prompt_tokens:
+        return text
+
+    all_entries = memory_bank.get_all()
+    n = len(all_entries)
+    while n > 1:
+        n = max(1, n // 2)
+        recent = all_entries[-n:]
+        messages = build_mm_prompt(memory_bank, session_id=session_id, turn_id=turn_id,
+                                   speaker=speaker, message=message, entries=recent)
+        text = tokenizer.apply_chat_template(messages, tokenize=False,
+                                             add_generation_prompt=True)
+        n_toks = len(tokenizer.encode(text, add_special_tokens=False))
+        if n_toks <= max_prompt_tokens:
+            return text
+
+    tok_ids = tokenizer.encode(text, add_special_tokens=False)
+    return tokenizer.decode(tok_ids[:max_prompt_tokens], skip_special_tokens=False)
 
 
 def parse_mm_output(raw_output: str) -> dict:

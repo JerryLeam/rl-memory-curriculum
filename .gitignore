@@ -49,3 +49,11 @@ checkpoints
 wandb
 logs
 unsloth_compiled_cache
+
+# CHTC compute artifacts — large generated files / scratch / backups
+# (broken symlink to /staging)
+results/results
+# Generated MM memory caches, ~50 MB each
+results/*_mm_memories.json
+# Local backups created during incident debugging
+submit_backup_*/

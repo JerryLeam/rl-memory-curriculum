@@ -495,11 +495,11 @@ def train_answer_agent(config: dict):
     # https://huggingface.co/docs/trl/en/unsloth_integration
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name,
-        dtype="auto",
+        dtype=torch.bfloat16,
         max_seq_length=max_seq_length,
         load_in_4bit=False,
         load_in_16bit=True,
-        fast_inference=False,  # Required for GRPO training
+        fast_inference=False,  # Unsloth fast_inference is incompatible with full_finetuning
         full_finetuning=not use_lora,
     )
     if tokenizer.pad_token is None:
@@ -889,11 +889,11 @@ Message: {turn['text'][:500]}
     # https://huggingface.co/docs/trl/en/unsloth_integration
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name,
-        dtype="auto",
+        dtype=torch.bfloat16,
         max_seq_length=max_seq_length,
         load_in_4bit=False,
         load_in_16bit=True,
-        fast_inference=False,  # Required for GRPO training
+        fast_inference=False,  # Unsloth fast_inference is incompatible with full_finetuning
         full_finetuning=not use_lora,
     )
     if tokenizer.pad_token is None:

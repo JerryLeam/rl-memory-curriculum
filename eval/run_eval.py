@@ -308,7 +308,7 @@ def run_mm_on_sessions_vllm(mm_llm, sessions, max_new_tokens=256):
     """
     from vllm import SamplingParams
     from src.memory_bank import MemoryBank
-    from src.memory_manager import build_mm_prompt, parse_mm_output, execute_mm_operation
+    from src.memory_manager import build_mm_text_with_budget, parse_mm_output, execute_mm_operation
 
     tokenizer = mm_llm.get_tokenizer()
     sampling_params = SamplingParams(
@@ -319,12 +319,9 @@ def run_mm_on_sessions_vllm(mm_llm, sessions, max_new_tokens=256):
     for session in sessions:
         sid = session.get("session_id", 0)
         for i, turn in enumerate(session.get("turns", [])):
-            messages = build_mm_prompt(
-                bank, session_id=sid, turn_id=i,
+            text = build_mm_text_with_budget(
+                tokenizer, bank, session_id=sid, turn_id=i,
                 speaker=turn["speaker"], message=turn["text"][:500],
-            )
-            text = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True,
             )
 
             outputs = mm_llm.generate([text], sampling_params)
@@ -350,7 +347,7 @@ def run_mm_all_conversations_vllm(mm_llm, conv_sessions, max_new_tokens=256):
     """
     from vllm import SamplingParams
     from src.memory_bank import MemoryBank
-    from src.memory_manager import build_mm_prompt, parse_mm_output, execute_mm_operation
+    from src.memory_manager import build_mm_text_with_budget, parse_mm_output, execute_mm_operation
 
     tokenizer = mm_llm.get_tokenizer()
     sampling_params = SamplingParams(
@@ -387,12 +384,9 @@ def run_mm_all_conversations_vllm(mm_llm, conv_sessions, max_new_tokens=256):
                 continue
             sid, turn_idx, turn = queue[pos]
             bank = conv_banks[conv_id]
-            messages = build_mm_prompt(
-                bank, session_id=sid, turn_id=turn_idx,
+            text = build_mm_text_with_budget(
+                tokenizer, bank, session_id=sid, turn_id=turn_idx,
                 speaker=turn["speaker"], message=turn["text"][:500],
-            )
-            text = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True,
             )
             batch_conv_ids.append(conv_id)
             batch_texts.append(text)

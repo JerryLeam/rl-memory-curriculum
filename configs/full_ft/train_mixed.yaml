@@ -14,8 +14,8 @@ data:
 training:
   algorithm: "grpo"
   use_lora: false
-  gradient_checkpointing: true
-  batch_size: 2
+  gradient_checkpointing: false
+  batch_size: 4
   group_size: 4
   learning_rate: 1.0e-6
   gradient_accumulation_steps: 2
@@ -36,4 +36,4 @@ retrieval:
 wandb:
   project: "rl-memory-curriculum"
   entity: null
-  enabled: true
+  enabled: false
