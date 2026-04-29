@@ -1,0 +1,35 @@
+# Train Config C (LongMemEval-only, full FT) on isyegpu4000
+
+universe        = vanilla
+executable      = scripts/run_train_one.sh
+arguments       = configs/full_ft/train_longmemeval_only.yaml
+
+initialdir      = /staging/rwu246/rl-memory-curriculum
+output          = logs/train_c.$(ClusterId).out
+error           = logs/train_c.$(ClusterId).err
+log             = logs/train_c.$(ClusterId).log
+stream_output   = true
+stream_error    = true
+
+requirements    = (Machine == "isyegpu4000.chtc.wisc.edu")
+require_gpus    = (DeviceName == "NVIDIA H200 NVL")
++WantFlocking   = false
+
+request_gpus    = 1
+request_cpus    = 16
+request_memory  = 200GB
+request_disk    = 60GB
+
++JobDurationCategory = "long"
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+transfer_executable     = true
+getenv                  = HOME,USER,LANG,LC_ALL
+
+periodic_release    = (JobStatus == 5) && ((HoldReasonCode == 34) || (HoldReasonCode == 26) || (HoldReasonCode == 3) || (HoldReasonCode == 16)) && (NumSystemHolds < 5) && ((time() - EnteredCurrentStatus) > 60)
+periodic_hold       = (NumSystemHolds >= 5)
+on_exit_hold        = (ExitCode =!= 0)
+on_exit_hold_reason = strcat("non-zero exit (", ExitCode, ")")
+
+queue 1

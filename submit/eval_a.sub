@@ -1,0 +1,36 @@
+# Eval Config A models (+baseline) on 1 H200.
+# Evaluates: baseline_no_rl, config_a_aa_only, config_a_full
+
+universe        = vanilla
+executable      = scripts/run_eval_subset.sh
+arguments       = baseline_no_rl config_a_aa_only config_a_full
+
+initialdir      = /staging/rwu246/rl-memory-curriculum
+output          = logs/eval_a.$(ClusterId).out
+error           = logs/eval_a.$(ClusterId).err
+log             = logs/eval_a.$(ClusterId).log
+stream_output   = true
+stream_error    = true
+
+requirements    = (Machine == "isyegpu4000.chtc.wisc.edu")
+require_gpus    = (DeviceName == "NVIDIA H200 NVL")
++WantFlocking   = false
+
+request_gpus    = 1
+request_cpus    = 16
+request_memory  = 200GB
+request_disk    = 60GB
+
++JobDurationCategory = "medium"
+
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+transfer_executable     = true
+getenv                  = HOME,USER,LANG,LC_ALL
+
+periodic_release    = (JobStatus == 5) && ((HoldReasonCode == 34) || (HoldReasonCode == 26) || (HoldReasonCode == 3) || (HoldReasonCode == 16)) && (NumSystemHolds < 5) && ((time() - EnteredCurrentStatus) > 60)
+periodic_hold       = (NumSystemHolds >= 5)
+on_exit_hold        = (ExitCode =!= 0)
+on_exit_hold_reason = strcat("non-zero exit (", ExitCode, ")")
+
+queue 1

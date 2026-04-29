@@ -1,0 +1,30 @@
+# DAG: 3 training configs in parallel on 3 H200 NVL GPUs (isyegpu4000),
+# then 3 eval jobs in parallel (each waits only on its own training),
+# then a CPU aggregation step that builds all_results.json + paper tables.
+#
+# Pipelines training and eval: an eval can start as soon as its config's
+# training completes, freeing one GPU while the other two trainings continue.
+#
+# Submit with:  condor_submit_dag submit/run.dag
+# Monitor:      condor_q -dag
+
+JOB TRAIN_A submit/train_a.sub
+JOB TRAIN_B submit/train_b.sub
+JOB TRAIN_C submit/train_c.sub
+JOB EVAL_A  submit/eval_a.sub
+JOB EVAL_B  submit/eval_b.sub
+JOB EVAL_C  submit/eval_c.sub
+JOB AGG     submit/aggregate.sub
+
+PARENT TRAIN_A CHILD EVAL_A
+PARENT TRAIN_B CHILD EVAL_B
+PARENT TRAIN_C CHILD EVAL_C
+PARENT EVAL_A EVAL_B EVAL_C CHILD AGG
+
+# Auto-retry transient failures (e.g., transfer hiccups) up to 2 times.
+RETRY TRAIN_A 2
+RETRY TRAIN_B 2
+RETRY TRAIN_C 2
+RETRY EVAL_A  2
+RETRY EVAL_B  2
+RETRY EVAL_C  2
