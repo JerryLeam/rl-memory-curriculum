@@ -1,12 +1,12 @@
-| Question Type | A (LoCoMo) | B (Mixed) | C (LME) | Δ (B-A) |
+| Question Type | Config A AA+MM (LoCoMo) | Config B AA+MM (Mixed) | Config C AA+MM (LME) | Delta (B-A) |
 |---|---|---|---|---|
-| knowledge-update | 0.122 | 0.107 | 0.110 | -0.015 |
-| multi-session | 0.066 | 0.061 | 0.070 | -0.004 |
-| multi_hop | 0.123 | 0.080 | 0.094 | -0.043 |
-| open_domain | 0.134 | 0.128 | 0.125 | -0.007 |
-| single-session-assistant | 0.138 | 0.117 | 0.105 | -0.021 |
-| single-session-preference | 0.141 | 0.167 | 0.164 | +0.025 |
-| single-session-user | 0.127 | 0.144 | 0.145 | +0.016 |
-| single_hop | 0.111 | 0.107 | 0.107 | -0.004 |
-| temporal | 0.113 | 0.116 | 0.089 | +0.003 |
-| temporal-reasoning | 0.173 | 0.183 | 0.147 | +0.010 |
+| knowledge-update | 0.140 | 0.136 | 0.142 | -0.004 |
+| multi-session | 0.089 | 0.085 | 0.088 | -0.004 |
+| multi_hop | 0.043 | 0.050 | 0.040 | +0.007 |
+| open_domain | 0.212 | 0.205 | 0.205 | -0.008 |
+| single-session-assistant | 0.184 | 0.187 | 0.197 | +0.004 |
+| single-session-preference | 0.180 | 0.179 | 0.163 | -0.001 |
+| single-session-user | 0.187 | 0.196 | 0.193 | +0.009 |
+| single_hop | 0.187 | 0.188 | 0.180 | +0.002 |
+| temporal | 0.127 | 0.131 | 0.122 | +0.004 |
+| temporal-reasoning | 0.171 | 0.149 | 0.172 | -0.022 |
